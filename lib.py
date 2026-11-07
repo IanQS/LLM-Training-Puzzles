@@ -3,6 +3,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple, FrozenSet, TypeVar
 from chalk import Diagram
+import marimo as mo
 import random
 
 class Barrier:
@@ -427,7 +428,7 @@ class Model:
         return v
 
     @staticmethod
-    def check(models : Sequence[Model]) -> None:
+    def check(models : Sequence[Model]) -> mo.Html:
         for l in range(models[0].LAYERS):
             weight = None
             for m in models:
@@ -441,7 +442,6 @@ class Model:
             assert weight.is_complete(), f"Weight not complete {weight}"
 
         print("Correct!")
-        from IPython.display import HTML
         pups = [
         "2m78jPG",
         "pn1e9TO",
@@ -484,8 +484,8 @@ class Model:
         "DKLBJh7",
         "eyxH0Wc",
         "rJEkEw4"]
-        return HTML("""
+        return mo.Html(f"""
         <video alt="test" controls autoplay=1>
-            <source src="https://openpuppies.com/mp4/%s.mp4"  type="video/mp4">
+            <source src="https://openpuppies.com/mp4/{random.choice(pups)}.mp4"  type="video/mp4">
         </video>
-        """%(random.sample(pups, 1)[0]))
+        """)
