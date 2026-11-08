@@ -4,7 +4,7 @@ __generated_with = "0.25.2"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(column=0)
 def _():
     import asyncio
 
@@ -201,7 +201,7 @@ def _(draw, model):
     return
 
 
-@app.cell
+@app.cell(column=1)
 def _(mo):
     mo.md(r"""
     ### Puzzle 0 - Standard Training
@@ -307,7 +307,7 @@ def _(Model, grad_accum_out):
     return
 
 
-@app.cell
+@app.cell(column=2)
 def _(mo):
     mo.md(r"""
     ## Communications: AllReduce
@@ -413,7 +413,7 @@ def _(Model, ddp_out):
     return
 
 
-@app.cell
+@app.cell(column=3)
 def _(mo):
     mo.md(r"""
     ## Communication: AllGather / Sharding
@@ -512,7 +512,7 @@ def _(Model, wsdp_out):
     return
 
 
-@app.cell
+@app.cell(column=4)
 def _(mo):
     mo.md(r"""
     ## Communication: Scatter-Reduce
@@ -609,7 +609,7 @@ def _(Model, fsdp_out):
     return
 
 
-@app.cell
+@app.cell(column=5)
 def _(mo):
     mo.md(r"""
     ## Communication: Point-to-Point
