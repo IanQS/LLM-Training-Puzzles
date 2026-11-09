@@ -53,7 +53,7 @@ def _(Model):
     )
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     Our library has 5 parts:
@@ -226,6 +226,10 @@ def _(Model):
 
         # Load the input layer activations
         activations[0] = model.get_activation(range(model.BATCHES))
+
+        for l_ind in range(model.LAYERS):
+            activations[l_ind + 1] = model.forward(layer=l_ind, inp=activations[0], weight=weights[0])
+            activations[2] = model.forward(layer=1, inp=activations[1], weight=weights[1])
 
         assert False, 'TODO: Implement me'
 
