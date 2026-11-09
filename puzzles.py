@@ -224,14 +224,19 @@ def _(Model):
         for l in range(model.LAYERS):
             weights[l], opt_states[l] = model.load_weights(l)
 
-        # Load the input layer activations
         activations[0] = model.get_activation(range(model.BATCHES))
-
         for l_ind in range(model.LAYERS):
-            activations[l_ind + 1] = model.forward(layer=l_ind, inp=activations[0], weight=weights[0])
-            activations[2] = model.forward(layer=1, inp=activations[1], weight=weights[1])
+            activations[l_ind + 1] = model.forward(layer=l_ind, inp=activations[l_ind], weight=weights[l_ind])
+        # Calculate the loss and get the activations
+        grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
 
-        assert False, 'TODO: Implement me'
+        for i in range(model.LAYERS, -1, -1):
+            grad_weights[i], grad_activations[i] = model.backward(i, activations[i], grad_activations[i+1], weights[i])
+
+        for i in range(model.LAYERS, -1, -1):
+            weights[l], opt_states[l] = model.update(i, weight_grad=grad_weights[i], weight=weights[i], opt_state=opt_states[i])
+    
+        # assert False, 'TODO: Implement me'
 
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
