@@ -225,14 +225,16 @@ def _(Model):
             weights[l], opt_states[l] = model.load_weights(l)
 
         ##################
-        # Forward mode
+        # Forward pass
         activations[0] = model.get_activation(range(model.BATCHES))
         for l in range(model.LAYERS):
             activations[l + 1] = model.forward(layer=l, inp=activations[l], weight=weights[l])
+    
         # Calculate the loss and get the activations
         grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
 
         del activations[model.LAYERS]
+    
         ##################
         # Get the gradients
         for l in range(model.LAYERS - 1, -1, -1):
@@ -250,7 +252,6 @@ def _(Model):
             weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
                                                      weight=weights[l], opt_state=opt_states[l])
             del grad_weights[l]
-            del opt_states[l]
 
     
         for l in range(model.LAYERS):
@@ -304,7 +305,47 @@ def _(Model):
         for l in range(model.LAYERS):
             weights[l], opt_states[l] = model.load_weights(l)
 
-        assert False, 'TODO: Implement me'
+        ##########################################################################################
+        for batch_i in range(model.BATCHES):
+            activations[batch_i, 0] = model.get_activation(batches=[batch_i])
+    
+            # Forward pass
+            for l in range(model.LAYERS):
+                activations[batch_i, l + 1] = model.forward(layer=l, inp=activations[batch_i, l], weight=weights[l])
+        
+            # Calculate the loss and get the activations
+            grad_activations[batch_i, model.LAYERS] = model.loss(activations[batch_i, model.LAYERS])
+
+            del activations[batch_i, model.LAYERS]
+            ##################
+            # Get the gradients
+            for l in range(model.LAYERS - 1, -1, -1):
+                grad_weights[batch_i, l], grad_activations[batch_i, l] = model.backward(
+                    l, activations[batch_i, l], grad_activations[batch_i, l+1], weights[l]
+                )
+
+                if l in grad_weights:
+                    grad_weights[l] = grad_weights[l] + grad_weights[batch_i, l]
+                else:
+                    grad_weights[l] = grad_weights[batch_i, l]
+            
+                del grad_activations[batch_i, l + 1], activations[batch_i, l], grad_weights[batch_i, l]
+            del grad_activations[batch_i, 0]
+        
+
+        assert len(grad_activations) == 0 and len(activations) ==0,\
+            f"Grad Act: {len(grad_activations)} && Act: {len(activations)}"
+    
+        ##################
+        # Update the model
+        for l in range(model.LAYERS):
+            weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
+                                                     weight=weights[l], opt_state=opt_states[l])
+            del grad_weights[l]
+
+
+        ##########################################################################################
+        # assert False, 'TODO: Implement me'
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
         return model
@@ -328,6 +369,11 @@ def _(draw, grad_accum_out):
 @app.cell
 def _(Model, grad_accum_out):
     Model.check([grad_accum_out])
+    return
+
+
+@app.cell
+def _():
     return
 
 
@@ -406,6 +452,9 @@ def _(Model):
         weights, opt_states, activations, grad_activations, grad_weights = model.storage()
         # Load all the activations
         model.activations[0] = model.get_activation([model.rank])
+        ##########################################################################################
+
+        ##########################################################################################
 
         assert False, 'TODO: Implement me'
         for l in range(model.LAYERS):
@@ -505,7 +554,11 @@ def _(Model):
         for l in range(model.LAYERS):
             weights[l], opt_states[l] = model.load_weights(l, model.rank, model.RANKS)
 
+        ##########################################################################################
         assert False, 'TODO: Implement me'
+
+
+        ##########################################################################################
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
 
@@ -603,7 +656,9 @@ def _(Model):
         for l in range(model.LAYERS):
             weights[l], opt_states[l] = model.load_weights(l, model.rank, model.RANKS)
 
+        ##########################################################################################
         assert False, 'TODO: Implement me'
+        ##########################################################################################
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
         return model
@@ -683,7 +738,9 @@ def _(Model):
         my_layers = list([l + (model.rank * per_rank) for l in range(per_rank)])
         for l in my_layers:
             weights[l], opt_states[l] = model.load_weights(l)
+        ##########################################################################################
         assert False, 'TODO: Implement me'
+        ##########################################################################################
         for l in my_layers:
             model.set_final_weight(l, weights[l])
         return model
@@ -737,7 +794,9 @@ def _(Model):
         for l in my_layers:
             weights[l], opt_states[l] = model.load_weights(l)
 
+        ##########################################################################################
         assert False, 'TODO: Implement me'
+        ##########################################################################################
         for l in my_layers:
             model.set_final_weight(l, weights[l])
 
@@ -793,7 +852,9 @@ def _(Model):
             weights[l, 0], opt_states[l, 0] = model.load_weights(l, model.rank, model.RANKS)
         def empty_grad(l):
             return model.fake_grad(l, [])
+        ##########################################################################################
         assert False, 'TODO: Implement me'
+        ##########################################################################################
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
         # Update
