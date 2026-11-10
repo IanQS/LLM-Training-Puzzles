@@ -224,20 +224,35 @@ def _(Model):
         for l in range(model.LAYERS):
             weights[l], opt_states[l] = model.load_weights(l)
 
+        ##################
+        # Forward mode
         activations[0] = model.get_activation(range(model.BATCHES))
-        for l_ind in range(model.LAYERS):
-            activations[l_ind + 1] = model.forward(layer=l_ind, inp=activations[l_ind], weight=weights[l_ind])
+        for l in range(model.LAYERS):
+            activations[l + 1] = model.forward(layer=l, inp=activations[l], weight=weights[l])
         # Calculate the loss and get the activations
         grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
 
-        for i in range(model.LAYERS, -1, -1):
-            grad_weights[i], grad_activations[i] = model.backward(i, activations[i], grad_activations[i+1], weights[i])
+        del activations[model.LAYERS]
+        ##################
+        # Get the gradients
+        for l in range(model.LAYERS - 1, -1, -1):
+            grad_weights[l], grad_activations[l] = model.backward(l, activations[l], grad_activations[l+1], weights[l])
+            del grad_activations[l + 1], activations[l]
+        del grad_activations[0]
 
-        for i in range(model.LAYERS, -1, -1):
-            weights[l], opt_states[l] = model.update(i, weight_grad=grad_weights[i], weight=weights[i], opt_state=opt_states[i])
     
-        # assert False, 'TODO: Implement me'
+        assert len(grad_activations) == 0 and len(activations) ==0,\
+            f"Grad Act: {len(grad_activations)} && Act: {len(activations)}"
+    
+        ##################
+        # Update the model
+        for l in range(model.LAYERS):
+            weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
+                                                     weight=weights[l], opt_state=opt_states[l])
+            del grad_weights[l]
+            del opt_states[l]
 
+    
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
         return model
