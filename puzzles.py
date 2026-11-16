@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.25.2"
-app = marimo.App()
+app = marimo.App(width="columns")
 
 
 @app.cell(column=0)
@@ -398,7 +398,7 @@ def _(mo):
 def _(WeightGrad):
     ranks = 4
     weight_grads = [WeightGrad(0, 1, {i}, ranks) for i in range(ranks)]
-    weight_grads[0] + weight_grads[1] + weight_grads[2] + weight_grads[3]
+    # weight_grads[0] + weight_grads[1] + weight_grads[2] + weight_grads[3]
     return ranks, weight_grads
 
 
@@ -418,7 +418,7 @@ async def _(Dist, Model, asyncio, myfunc, ranks):
     out_weight_grads = await asyncio.gather(*[
         myfunc(Model(layers=1, batches=1, rank=i, dist=_dist))
         for i in range(ranks)])
-    out_weight_grads[0]
+    # out_weight_grads[0]
     return
 
 
@@ -447,16 +447,38 @@ def _(mo):
 
 @app.cell
 def _(Model):
+
     async def ddp(model: Model) -> Model:
         # Storage on device.
         weights, opt_states, activations, grad_activations, grad_weights = model.storage()
         # Load all the activations
         model.activations[0] = model.get_activation([model.rank])
-        ##########################################################################################
 
+        for l in range(model.LAYERS):
+            weights[l], opt_states[l] = model.load_weights(l)
         ##########################################################################################
+    
+        ##########################################################################################
+        for layer_i in range(model.LAYERS):
+            activations[layer_i+1] = model.forward(
+                layer=layer_i, inp=activations[layer_i], weight=weights[layer_i]
+            )
 
-        assert False, 'TODO: Implement me'
+        grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
+        for l in range(model.LAYERS - 1, -1, -1):
+            grad_weights[l], grad_activations[l] = model.backward(
+                l, activations[l], grad_activations[l+1], weights[l]
+            )
+
+            del grad_activations[l+1], activations[l]
+    
+        for l in range(model.LAYERS):
+            grad_weights[l] = await model.allreduce(grad_weights[l], l)
+            weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
+                                                     weight=weights[l], opt_state=opt_states[l])
+            del grad_weights[l]
+
+        # assert False, 'TODO: Implement me'
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
         return model
@@ -483,6 +505,11 @@ def _(ddp_out, draw):
 @app.cell
 def _(Model, ddp_out):
     Model.check(ddp_out)
+    return
+
+
+@app.cell
+def _():
     return
 
 
