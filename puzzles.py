@@ -229,12 +229,12 @@ def _(Model):
         activations[0] = model.get_activation(range(model.BATCHES))
         for l in range(model.LAYERS):
             activations[l + 1] = model.forward(layer=l, inp=activations[l], weight=weights[l])
-    
+
         # Calculate the loss and get the activations
         grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
 
         del activations[model.LAYERS]
-    
+
         ##################
         # Get the gradients
         for l in range(model.LAYERS - 1, -1, -1):
@@ -242,10 +242,10 @@ def _(Model):
             del grad_activations[l + 1], activations[l]
         del grad_activations[0]
 
-    
+
         assert len(grad_activations) == 0 and len(activations) ==0,\
             f"Grad Act: {len(grad_activations)} && Act: {len(activations)}"
-    
+
         ##################
         # Update the model
         for l in range(model.LAYERS):
@@ -253,7 +253,7 @@ def _(Model):
                                                      weight=weights[l], opt_state=opt_states[l])
             del grad_weights[l]
 
-    
+
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
         return model
@@ -308,11 +308,11 @@ def _(Model):
         ##########################################################################################
         for batch_i in range(model.BATCHES):
             activations[batch_i, 0] = model.get_activation(batches=[batch_i])
-    
+
             # Forward pass
             for l in range(model.LAYERS):
                 activations[batch_i, l + 1] = model.forward(layer=l, inp=activations[batch_i, l], weight=weights[l])
-        
+
             # Calculate the loss and get the activations
             grad_activations[batch_i, model.LAYERS] = model.loss(activations[batch_i, model.LAYERS])
 
@@ -328,14 +328,14 @@ def _(Model):
                     grad_weights[l] = grad_weights[l] + grad_weights[batch_i, l]
                 else:
                     grad_weights[l] = grad_weights[batch_i, l]
-            
+
                 del grad_activations[batch_i, l + 1], activations[batch_i, l], grad_weights[batch_i, l]
             del grad_activations[batch_i, 0]
-        
+
 
         assert len(grad_activations) == 0 and len(activations) ==0,\
             f"Grad Act: {len(grad_activations)} && Act: {len(activations)}"
-    
+
         ##################
         # Update the model
         for l in range(model.LAYERS):
@@ -457,7 +457,7 @@ def _(Model):
         for l in range(model.LAYERS):
             weights[l], opt_states[l] = model.load_weights(l)
         ##########################################################################################
-    
+
         ##########################################################################################
         for layer_i in range(model.LAYERS):
             activations[layer_i+1] = model.forward(
@@ -471,7 +471,7 @@ def _(Model):
             )
 
             del grad_activations[l+1], activations[l]
-    
+
         for l in range(model.LAYERS):
             grad_weights[l] = await model.allreduce(grad_weights[l], l)
             weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
@@ -579,11 +579,37 @@ def _(Model):
 
         # Load a shard of the weights for every layer. Load in the full weights
         for l in range(model.LAYERS):
-            weights[l], opt_states[l] = model.load_weights(l, model.rank, model.RANKS)
+            weights[l], opt_states[l] = model.load_weights(l, shard=model.rank, total=model.RANKS)
 
         ##########################################################################################
-        assert False, 'TODO: Implement me'
+        # assert False, 'TODO: Implement me'
+        """
+        # Use allgather to collect the shards from all machines.
+        async def mygather(model: Model) -> WeightGrad:
+            # Allreduce sums together all the weight grads
+            return await model.allgather(weight_shards[model.rank], 0)
+        """
+        for layer_i in range(model.LAYERS):
+            weights[layer_i, -1] = await model.allgather(weights[layer_i], layer_i)
+            activations[layer_i+1] = model.forward(
+                layer=layer_i, inp=activations[layer_i], weight=weights[layer_i, -1]
+            )
+            del weights[layer_i, -1]
 
+        grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
+        for l in range(model.LAYERS - 1, -1, -1):
+            weights[l, -1] = await model.allgather(weights[l], l)
+            grad_weights[l], grad_activations[l] = model.backward(
+                l, activations[l], grad_activations[l+1], weights[l, -1]
+            )
+
+            del grad_activations[l+1], activations[l], weights[l, -1]
+
+        for l in range(model.LAYERS):
+            grad_weights[l] = await model.allreduce(grad_weights[l], l)
+            weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
+                                                     weight=weights[l], opt_state=opt_states[l])
+            del grad_weights[l]
 
         ##########################################################################################
         for l in range(model.LAYERS):
@@ -613,6 +639,11 @@ def _(draw, wsdp_out):
 @app.cell
 def _(Model, wsdp_out):
     Model.check(wsdp_out)
+    return
+
+
+@app.cell
+def _():
     return
 
 
@@ -684,7 +715,31 @@ def _(Model):
             weights[l], opt_states[l] = model.load_weights(l, model.rank, model.RANKS)
 
         ##########################################################################################
-        assert False, 'TODO: Implement me'
+        # assert False, 'TODO: Implement me'
+
+        for layer_i in range(model.LAYERS):
+            weights[layer_i, -1] = await model.allgather(weights[layer_i], layer_i)
+            activations[layer_i+1] = model.forward(
+                layer=layer_i, inp=activations[layer_i], weight=weights[layer_i, -1]
+            )
+            del weights[layer_i, -1]
+
+        grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
+        for l in range(model.LAYERS - 1, -1, -1):
+            weights[l, -1] = await model.allgather(weights[l], l)
+            grad_weights[l], grad_activations[l] = model.backward(
+                l, activations[l], grad_activations[l+1], weights[l, -1]
+            )
+
+            del grad_activations[l+1], activations[l], weights[l, -1]
+
+        for l in range(model.LAYERS):
+            grad_weights[l] = await model.allreduce(grad_weights[l], l)
+            weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
+                                                     weight=weights[l], opt_state=opt_states[l])
+            del grad_weights[l]
+    
+
         ##########################################################################################
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
