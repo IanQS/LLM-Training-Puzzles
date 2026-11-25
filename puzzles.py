@@ -727,22 +727,25 @@ def _(Model):
         grad_activations[model.LAYERS] = model.loss(activations[model.LAYERS])
         for l in range(model.LAYERS - 1, -1, -1):
             weights[l, -1] = await model.allgather(weights[l], l)
-            grad_weights[l], grad_activations[l] = model.backward(
+            grad_weights[l, -1], grad_activations[l] = model.backward(
                 l, activations[l], grad_activations[l+1], weights[l, -1]
             )
-
             del grad_activations[l+1], activations[l], weights[l, -1]
+            grad_weights[l] = await model.scatterreduce(grad_weights[l, -1], l)
+
+            del grad_weights[l, -1]
 
         for l in range(model.LAYERS):
-            grad_weights[l] = await model.allreduce(grad_weights[l], l)
             weights[l], opt_states[l] = model.update(l, weight_grad=grad_weights[l], 
                                                      weight=weights[l], opt_state=opt_states[l])
+
             del grad_weights[l]
     
 
         ##########################################################################################
         for l in range(model.LAYERS):
             model.set_final_weight(l, weights[l])
+
         return model
 
     return (fsdp,)
@@ -767,6 +770,11 @@ def _(draw, fsdp_out):
 @app.cell
 def _(Model, fsdp_out):
     Model.check(fsdp_out)
+    return
+
+
+@app.cell
+def _():
     return
 
 
